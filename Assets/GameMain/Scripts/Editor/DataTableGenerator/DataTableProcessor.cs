@@ -12,6 +12,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using UnityEngine;
+using NPOI.XSSF.UserModel;
+using NPOI.SS.UserModel;
 
 namespace StarForce.Editor.DataTableTools
 {
@@ -42,9 +44,9 @@ namespace StarForce.Editor.DataTableTools
                 throw new GameFrameworkException("Data table file name is invalid.");
             }
 
-            if (!dataTableFileName.EndsWith(".txt", StringComparison.Ordinal))
+            if (!dataTableFileName.EndsWith(".txt", StringComparison.Ordinal) && !dataTableFileName.EndsWith(".xlsx", StringComparison.Ordinal))
             {
-                throw new GameFrameworkException(Utility.Text.Format("Data table file '{0}' is not a txt.", dataTableFileName));
+                throw new GameFrameworkException(Utility.Text.Format("Data table file '{0}' is not a txt or xlsx.", dataTableFileName));
             }
 
             if (!File.Exists(dataTableFileName))
@@ -52,32 +54,76 @@ namespace StarForce.Editor.DataTableTools
                 throw new GameFrameworkException(Utility.Text.Format("Data table file '{0}' is not exist.", dataTableFileName));
             }
 
-            string[] lines = File.ReadAllLines(dataTableFileName, encoding);
-            int rawRowCount = lines.Length;
-
-            int rawColumnCount = 0;
+            int tempRawColumnCount = 0;
             List<string[]> rawValues = new List<string[]>();
-            for (int i = 0; i < lines.Length; i++)
+            
+            if (dataTableFileName.EndsWith(".txt", StringComparison.Ordinal))
             {
-                string[] rawValue = lines[i].Split(DataSplitSeparators);
-                for (int j = 0; j < rawValue.Length; j++)
+                string[] lines = File.ReadAllLines(dataTableFileName, encoding);
+                
+                for (int i = 0; i < lines.Length; i++)
                 {
-                    rawValue[j] = rawValue[j].Trim(DataTrimSeparators);
-                }
+                    string[] rawValue = lines[i].Split(DataSplitSeparators);
+                    for (int j = 0; j < rawValue.Length; j++)
+                    {
+                        rawValue[j] = rawValue[j].Trim(DataTrimSeparators);
+                    }
 
-                if (i == 0)
-                {
-                    rawColumnCount = rawValue.Length;
-                }
-                else if (rawValue.Length != rawColumnCount)
-                {
-                    throw new GameFrameworkException(Utility.Text.Format("Data table file '{0}', raw Column is '{2}', but line '{1}' column is '{3}'.", dataTableFileName, i.ToString(), rawColumnCount.ToString(), rawValue.Length.ToString()));
-                }
+                    if (i == 0)
+                    {
+                        tempRawColumnCount = rawValue.Length;
+                    }
+                    else if (rawValue.Length != tempRawColumnCount)
+                    {
+                        throw new GameFrameworkException(Utility.Text.Format("Data table file '{0}', raw Column is '{2}', but line '{1}' column is '{3}'.", dataTableFileName, i.ToString(), tempRawColumnCount.ToString(), rawValue.Length.ToString()));
+                    }
 
-                rawValues.Add(rawValue);
+                    rawValues.Add(rawValue);
+                }
             }
+            else
+            {
+                XSSFWorkbook xssfWorkbook;
+                using (FileStream file = new FileStream(dataTableFileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    xssfWorkbook = new XSSFWorkbook(file);
+                }
 
+                int maxCellNum = 0;
+                ISheet sheet = xssfWorkbook.GetSheetAt(0);
+                for (int i = 0; i <= sheet.LastRowNum; i++)
+                {
+                    IRow row = sheet.GetRow(i);
+                    for (int j = 0; j < row.LastCellNum; j++)
+                    {
+                        maxCellNum = Mathf.Max(maxCellNum, row.LastCellNum);
+                    }
+                }
+
+                for (int i = 0; i <= sheet.LastRowNum; i++)
+                {
+                    List<string> lines = new List<string>();
+                    
+                    IRow row = sheet.GetRow(i);
+
+                    for (int j = 0; j < maxCellNum; j++)
+                    {
+                        ICell cell = row.GetCell(j);
+                        if (cell != null)
+                        {
+                            lines.Add(cell.ToString().Trim(DataTrimSeparators));
+                        }
+                        else
+                        {
+                            lines.Add("");
+                        }
+                    }
+                    rawValues.Add(lines.ToArray());
+                }
+            }
             m_RawValues = rawValues.ToArray();
+            int rawRowCount = m_RawValues.Length;
+            int rawColumnCount = m_RawValues[0].Length;
 
             if (nameRow < 0)
             {

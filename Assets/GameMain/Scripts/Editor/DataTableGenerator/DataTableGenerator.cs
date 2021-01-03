@@ -25,7 +25,13 @@ namespace StarForce.Editor.DataTableTools
 
         public static DataTableProcessor CreateDataTableProcessor(string dataTableName)
         {
-            return new DataTableProcessor(Utility.Path.GetRegularPath(Path.Combine(DataTablePath, dataTableName + ".txt")), Encoding.GetEncoding("GB2312"), 1, 2, null, 3, 4, 1);
+            string dataTableFileName =
+                Utility.Path.GetRegularPath(Path.Combine(DataTablePath, dataTableName + ".xlsx"));
+            if (!File.Exists(dataTableFileName))
+            {
+                dataTableFileName = Utility.Path.GetRegularPath(Path.Combine(DataTablePath, dataTableName + ".txt"));
+            }
+            return new DataTableProcessor(dataTableFileName, Encoding.GetEncoding("GB2312"), 1, 2, null, 3, 4, 1);
         }
 
         public static bool CheckRawData(DataTableProcessor dataTableProcessor, string dataTableName)
